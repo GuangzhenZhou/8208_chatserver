@@ -6,6 +6,10 @@ import concurrent.futures
 import hashlib
 import os
 import json
+import psutil
+import logging
+import threading
+from flask import Flask, jsonify
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
@@ -95,7 +99,39 @@ class Server:
                                     user_id=user_id,
                                     addr=addr))
 
+    def monitor(self):
+        while True:
+            cpu_usage = psutil.cpu_percent()
+            memory_usage = psutil.virtual_memory().percent
+            net_io = psutil.net_io_counters()
+            logging.info(f"CPU usage: {cpu_usage}%")
+            logging.info(f"Memory usage: {memory_usage}%")
+            logging.info(f"Network IO: {net_io}")
+            time.sleep(60)  # sleep for 60 seconds
 
 if __name__ == "__main__":
+        
+    app = Flask(__name__)
+
+    @app.route('/monitor')
+    def monitor():
+        cpu_usage = psutil.cpu_percent()
+        memory_usage = psutil.virtual_memory().percent
+        net_io = psutil.net_io_counters()
+        return jsonify({
+            'cpu_usage': cpu_usage,
+            'memory_usage': memory_usage,
+            'net_io': net_io,
+        })
+
+    def start_flask_app():
+        app.run(host='0.0.0.0', port=5001)
+
+    # Start the Flask app in a new thread
+    flask_thread = threading.Thread(target=start_flask_app)
+    flask_thread.start()
+    
     ser = Server()
     ser.execute()
+
+    
