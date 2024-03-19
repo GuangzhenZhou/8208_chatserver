@@ -9,7 +9,7 @@ pipenv shell
 # Generate a user
 
 ```
-python testing/generate_users.py 2 password
+python testing/generate_users.py 2 luke1234
 ```
 
 # Start the server
