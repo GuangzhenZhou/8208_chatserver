@@ -73,6 +73,7 @@ class Client:
         key_bytes = self.server.recv(4096)
         key = serialization.load_pem_public_key(key_bytes)
         self.state["keyring"][user_id] = key
+        print(key)
         return key
 
     def send_message(self, string):
@@ -83,6 +84,8 @@ class Client:
         if not self.state["dest"] in self.state["keyring"]:
             destination_key = self.load_user_key(self.state["dest"])
 
+        destination_key = self.state["keyring"][self.state["dest"]]
+        
         ciphertext = destination_key.encrypt(
             string.encode(),
             padding.OAEP(padding.MGF1(algorithm=hashes.SHA256()),
