@@ -31,6 +31,9 @@ class Server:
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind((args_dict["addr"], args_dict["port"]))
         self.sock.listen(100)
+        
+        self.message_backup_dir = 'message_backups'
+        os.makedirs(self.message_backup_dir, exist_ok=True)
 
     def identify_client(self, conn):
         conn.send(b"Send user_id")
@@ -62,10 +65,12 @@ class Server:
             user_id = string[9:]
             self.clients[sender].send(self.user_keys[user_id])
 
-    def route_message(self, msg):
+    def route_message(self, msg, user_id):
         msg_obj = json.loads(msg)
         dest_conn = self.clients[msg_obj["dest"]]
         dest_conn.send(msg_obj["text"].strip().encode())
+        with open(os.path.join(self.message_backup_dir, f'{user_id}.txt'), 'a') as f:
+            f.write(msg.decode() + '\n')
 
     def client_handler(self, user_id, addr):
         conn = self.clients[user_id]
@@ -78,7 +83,7 @@ class Server:
                     if msg.decode()[0] == "!":
                         self.command_handler(msg.decode(), user_id)
                     else:
-                        self.route_message(msg)
+                        self.route_message(msg, user_id)
                 else:
                     del self.clients[user_id]
             except:
