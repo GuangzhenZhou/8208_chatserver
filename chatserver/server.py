@@ -6,6 +6,7 @@ import concurrent.futures
 import hashlib
 import os
 import json
+import time
 import psutil
 import logging
 import threading
@@ -20,9 +21,7 @@ args.add_argument("addr", action="store", help="IP address")
 args.add_argument("port", type=int, action="store", help="Port")
 args_dict = vars(args.parse_args())
 
-
 class Server:
-
     def __init__(self):
         self.clients = {}
         self.user_keys = {}
@@ -33,6 +32,7 @@ class Server:
         self.sock.listen(100)
         
         self.message_backup_dir = 'message_backups'
+        self.file_dir = 'file_dir'
         os.makedirs(self.message_backup_dir, exist_ok=True)
 
     def identify_client(self, conn):
@@ -68,20 +68,28 @@ class Server:
     def route_message(self, msg, user_id):
         msg_obj = json.loads(msg)
         dest_conn = self.clients[msg_obj["dest"]]
+        
         dest_conn.send(msg_obj["text"].strip().encode())
         with open(os.path.join(self.message_backup_dir, f'{user_id}.txt'), 'a') as f:
             f.write(msg.decode() + '\n')
+            
+    def route_file(self,user_id, filename, filedata):
+        with open(os.path.join(self.message_backup_dir, f'{filename}'), 'a') as f:
+            f.write(filedata)
 
     def client_handler(self, user_id, addr):
         conn = self.clients[user_id]
-
         while True:
             try:
                 msg = conn.recv(4096)
                 if msg:
                     print(f"<{addr[0]}> {msg}")
                     if msg.decode()[0] == "!":
-                        self.command_handler(msg.decode(), user_id)
+                        if msg.decode()[1:9] == "SENDFILE":
+                            filename, filedata = msg.decode()[10:].split()
+                            self.route_file(user_id, filename, filedata)
+                        else:
+                            self.command_handler(msg.decode(), user_id)
                     else:
                         self.route_message(msg, user_id)
                 else:
@@ -112,7 +120,16 @@ class Server:
             logging.info(f"CPU usage: {cpu_usage}%")
             logging.info(f"Memory usage: {memory_usage}%")
             logging.info(f"Network IO: {net_io}")
-            time.sleep(60)  # sleep for 60 seconds
+            time.sleep(60)
+            
+    def receive_file(self, conn, filename):
+        with open(filename, 'wb') as f:
+            while True:
+                data = conn.recv(4096)
+                if not data:
+                    break
+                f.write(data)
+        conn.send(b"File sended")
 
 if __name__ == "__main__":
         
