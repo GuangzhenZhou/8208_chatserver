@@ -7,6 +7,9 @@ name = "pypi"
 pylint = "*"
 yapf = "*"
 cryptography = "*"
+numpy = "*"
+psutil = "*"
+flask = "*"
 
 [dev-packages]
 

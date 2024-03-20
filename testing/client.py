@@ -67,6 +67,9 @@ class Client:
         if string[0:9] == "!WRITELOG":
             with open("message_log", "w+") as logfile:
                 logfile.write("\n".join(self.state["msg_log"]))
+        elif string[0:9] == "!SENDFILE":
+            filename = string[10:]
+            self.send_file(filename)
 
     def load_user_key(self, user_id):
         self.server.send(f"!SENDKEY {user_id}".encode())
@@ -75,7 +78,32 @@ class Client:
         self.state["keyring"][user_id] = key
         print(key)
         return key
+    
+    def send_file(self, filename):
+        with open(filename, "rb") as file:
+            file_data = file.read()
 
+            if not self.state["dest"]:
+                print("Cannot send file. No destination set.")
+                return
+                
+            destination_key = self.state["keyring"][self.state["dest"]]
+            
+            ciphertext = destination_key.encrypt(
+                file_data.encode(),
+                padding.OAEP(padding.MGF1(algorithm=hashes.SHA256()),
+                            hashes.SHA256(), None))
+            
+            ciphertext_b64_str = base64.b64encode(ciphertext).decode()
+            
+            message = json.dumps({
+                "dest": self.state["dest"],
+                "text": f"!SENDFILE {filename} {ciphertext_b64_str}"
+            })
+            
+            self.state["msg_log"].append(message)
+            self.server.send(message.encode())
+    
     def send_message(self, string):
         if not self.state["dest"]:
             print("Cannot send message. No destination set.")
@@ -118,7 +146,7 @@ class Client:
                     self.receive_message(msg)
                 else:
                     msg = sys.stdin.readline().strip()
-                    if msg[0] == "!":
+                    if msg and msg[0] == "!":
                         self.command_handler(msg)
                     else:
                         self.send_message(msg)
